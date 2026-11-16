@@ -1,0 +1,59 @@
+# Go 1.27 toolchain from the official go.dev distribution.
+# Why custom: Alpine v3.24 ships go 1.26; go 1.27 exists only in edge.
+# Remove this package once the Alpine stable branch we pin ships go 1.27.
+package:
+  name: go-1.27
+  version: 1.27.4
+  epoch: 0
+  description: Go 1.27 toolchain (official go.dev release)
+  copyright:
+    - license: BSD-3-Clause
+  dependencies:
+    runtime:
+      - ca-certificates-bundle
+    provides:
+      - go=${{package.full-version}}
+  options:
+    # The toolchain ships its own test data and prebuilt objects; scanning
+    # them for shared-object deps produces bogus runtime dependencies.
+    no-depends: true
+    no-provides: true
+
+environment:
+  contents:
+    repositories:
+      - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    packages:
+      - busybox
+      - ca-certificates-bundle
+
+pipeline:
+  - assertions:
+      required-steps: 1
+    pipeline:
+      - uses: fetch
+        if: ${{build.arch}} == 'x86_64'
+        with:
+          uri: https://go.dev/dl/go${{package.version}}.linux-amd64.tar.gz
+          expected-sha256: 7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
+          strip-components: 0
+      - uses: fetch
+        if: ${{build.arch}} == 'aarch64'
+        with:
+          uri: https://go.dev/dl/go${{package.version}}.linux-arm64.tar.gz
+          expected-sha256: 3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92
+          strip-components: 0
+
+  - runs: |
+      set -eu
+      mkdir -p "${{targets.destdir}}/usr/lib" "${{targets.destdir}}/usr/bin"
+      mv go "${{targets.destdir}}/usr/lib/go"
+      ln -s /usr/lib/go/bin/go "${{targets.destdir}}/usr/bin/go"
+      ln -s /usr/lib/go/bin/gofmt "${{targets.destdir}}/usr/bin/gofmt"
+      # Smoke test: the release binaries are static and run on musl.
+      "${{targets.destdir}}/usr/lib/go/bin/go" version
+
+update:
+  enabled: true
+  release-monitor:
+    identifier: 1227

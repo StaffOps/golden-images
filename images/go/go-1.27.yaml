@@ -1,0 +1,49 @@
+# Go 1.27 build image (root, shell, cgo toolchain). Ship binaries on ghcr.io/staffops/static.
+contents:
+  keyring:
+    - ./dist/packages/melange.rsa.pub
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
+    - '@local /work/dist/packages'
+  packages:
+    - alpine-baselayout-data
+    - alpine-release
+    - ca-certificates-bundle
+    - tzdata
+    - go-1.27@local
+    - bash
+    - busybox
+    - build-base
+    - git
+    - openssh-client
+    - curl
+    - make
+accounts:
+  groups:
+    - groupname: nonroot
+      gid: 65532
+  users:
+    - username: nonroot
+      uid: 65532
+      gid: 65532
+      homedir: /home/nonroot
+  run-as: "0"
+work-dir: /src
+environment:
+  GOPATH: /go
+  # Never auto-download a different toolchain: the image *is* the pin.
+  GOTOOLCHAIN: local
+  PATH: /go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+paths:
+  - path: /go
+    type: directory
+    permissions: 0o777
+cmd: /bin/bash -l
+archs:
+  - amd64
+  - arm64
+annotations:
+  org.opencontainers.image.source: https://github.com/StaffOps/golden-images
+  org.opencontainers.image.vendor: StaffOps
+  org.opencontainers.image.description: "Go 1.27 build image"

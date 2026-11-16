@@ -1,0 +1,43 @@
+# Node.js 24 development/build image (root, shell, npm/pnpm/yarn, node-gyp toolchain).
+contents:
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
+  packages:
+    - alpine-baselayout-data
+    - alpine-release
+    - ca-certificates-bundle
+    - tzdata
+    - nodejs=~24
+    - npm
+    - pnpm
+    - yarn
+    - bash
+    - busybox
+    - build-base
+    - python3
+    - git
+    - openssh-client
+    - curl
+    - jq
+accounts:
+  groups:
+    - groupname: nonroot
+      gid: 65532
+  users:
+    - username: nonroot
+      uid: 65532
+      gid: 65532
+      homedir: /home/nonroot
+  run-as: "0"
+work-dir: /app
+environment:
+  NPM_CONFIG_UPDATE_NOTIFIER: "false"
+cmd: /bin/bash -l
+archs:
+  - amd64
+  - arm64
+annotations:
+  org.opencontainers.image.source: https://github.com/StaffOps/golden-images
+  org.opencontainers.image.vendor: StaffOps
+  org.opencontainers.image.description: "Node.js 24 build image"

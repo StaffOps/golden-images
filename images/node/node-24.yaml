@@ -1,0 +1,39 @@
+# Node.js 24 runtime (non-root, no shell, no npm).
+contents:
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
+  packages:
+    - alpine-baselayout-data
+    - alpine-release
+    - ca-certificates-bundle
+    - tzdata
+    - nodejs=~24
+accounts:
+  groups:
+    - groupname: nonroot
+      gid: 65532
+  users:
+    - username: nonroot
+      uid: 65532
+      gid: 65532
+      homedir: /home/nonroot
+  run-as: "65532"
+work-dir: /app
+paths:
+  - path: /app
+    type: directory
+    uid: 65532
+    gid: 65532
+    permissions: 0o755
+environment:
+  NODE_ENV: production
+entrypoint:
+  command: /usr/bin/node
+archs:
+  - amd64
+  - arm64
+annotations:
+  org.opencontainers.image.source: https://github.com/StaffOps/golden-images
+  org.opencontainers.image.vendor: StaffOps
+  org.opencontainers.image.description: "Node.js 24 runtime"

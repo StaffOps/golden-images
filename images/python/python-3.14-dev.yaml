@@ -1,0 +1,51 @@
+# Python 3.14 development/build image (root, shell, pip, uv, C toolchain for wheels).
+contents:
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
+  packages:
+    - alpine-baselayout-data
+    - alpine-release
+    - ca-certificates-bundle
+    - tzdata
+    - python3=~3.14
+    - python3-dev
+    - py3-pip
+    - uv
+    - bash
+    - busybox
+    - build-base
+    - linux-headers
+    - libffi-dev
+    - openssl-dev
+    - git
+    - openssh-client
+    - curl
+    - jq
+accounts:
+  groups:
+    - groupname: nonroot
+      gid: 65532
+  users:
+    - username: nonroot
+      uid: 65532
+      gid: 65532
+      homedir: /home/nonroot
+  run-as: "0"
+work-dir: /app
+environment:
+  LANG: C.UTF-8
+  PYTHONDONTWRITEBYTECODE: "1"
+  PYTHONUNBUFFERED: "1"
+  # Disposable build container: allow `pip install` outside a venv (PEP 668).
+  PIP_BREAK_SYSTEM_PACKAGES: "1"
+  PIP_NO_CACHE_DIR: "1"
+  UV_PYTHON_DOWNLOADS: never
+cmd: /bin/bash -l
+archs:
+  - amd64
+  - arm64
+annotations:
+  org.opencontainers.image.source: https://github.com/StaffOps/golden-images
+  org.opencontainers.image.vendor: StaffOps
+  org.opencontainers.image.description: "Python 3.14 build image"

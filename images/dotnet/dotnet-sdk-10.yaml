@@ -1,0 +1,43 @@
+# .NET 10 SDK build image (root, shell).
+contents:
+  repositories:
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
+  packages:
+    - alpine-baselayout-data
+    - alpine-release
+    - ca-certificates-bundle
+    - tzdata
+    - dotnet10-sdk
+    - bash
+    - busybox
+    - git
+    - openssh-client
+    - curl
+accounts:
+  groups:
+    - groupname: nonroot
+      gid: 65532
+  users:
+    - username: nonroot
+      uid: 65532
+      gid: 65532
+      homedir: /home/nonroot
+  run-as: "0"
+work-dir: /src
+environment:
+  DOTNET_ROOT: /usr/lib/dotnet
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  DOTNET_RUNNING_IN_CONTAINER: "true"
+  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: "false"
+  NUGET_XMLDOC_MODE: skip
+  PATH: /root/.dotnet/tools:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+cmd: /bin/bash -l
+archs:
+  - amd64
+  - arm64
+annotations:
+  org.opencontainers.image.source: https://github.com/StaffOps/golden-images
+  org.opencontainers.image.vendor: StaffOps
+  org.opencontainers.image.description: ".NET 10 SDK"

@@ -1,0 +1,21 @@
+StaffOps golden-images
+Copyright 2026 StaffOps
+
+This repository contains build definitions (apko image configs, melange package specs,
+scripts and CI workflows), licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The container images built from these definitions redistribute third-party software,
+each under its own license, including but not limited to:
+
+  - Alpine Linux packages (various licenses; see each package's metadata)
+  - Node.js (MIT)          https://github.com/nodejs/node
+  - Python (PSF-2.0)       https://www.python.org/psf/license/
+  - Go (BSD-3-Clause)      https://go.dev/LICENSE
+  - .NET (MIT)             https://github.com/dotnet/dotnet
+
+Every published image includes an SPDX SBOM listing each package and its license.
+License texts shipped by upstream packages are preserved inside the images.
+
+StaffOps is not affiliated with or endorsed by any of the projects above. Their names
+are trademarks of their respective owners and are used here only to describe the software
+contained in the images.

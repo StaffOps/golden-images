@@ -1,0 +1,144 @@
+{
+  "registry": "ghcr.io/staffops",
+  "images": [
+    {
+      "name": "static",
+      "config": "images/base/static.yaml",
+      "repo": "static",
+      "tags": [
+        "latest"
+      ],
+      "test": "static"
+    },
+    {
+      "name": "node-22",
+      "config": "images/node/node-22.yaml",
+      "repo": "node",
+      "tags": [
+        "22"
+      ],
+      "test": "node"
+    },
+    {
+      "name": "node-22-dev",
+      "config": "images/node/node-22-dev.yaml",
+      "repo": "node",
+      "tags": [
+        "22-dev"
+      ],
+      "test": "node-dev"
+    },
+    {
+      "name": "node-24",
+      "config": "images/node/node-24.yaml",
+      "repo": "node",
+      "tags": [
+        "24"
+      ],
+      "test": "node"
+    },
+    {
+      "name": "node-24-dev",
+      "config": "images/node/node-24-dev.yaml",
+      "repo": "node",
+      "tags": [
+        "24-dev"
+      ],
+      "test": "node-dev"
+    },
+    {
+      "name": "node-26",
+      "config": "images/node/node-26.yaml",
+      "repo": "node",
+      "tags": [
+        "26",
+        "lts",
+        "latest"
+      ],
+      "test": "node"
+    },
+    {
+      "name": "node-26-dev",
+      "config": "images/node/node-26-dev.yaml",
+      "repo": "node",
+      "tags": [
+        "26-dev",
+        "lts-dev",
+        "latest-dev"
+      ],
+      "test": "node-dev"
+    },
+    {
+      "name": "python-3.14",
+      "config": "images/python/python-3.14.yaml",
+      "repo": "python",
+      "tags": [
+        "3.14",
+        "latest"
+      ],
+      "test": "python"
+    },
+    {
+      "name": "python-3.14-dev",
+      "config": "images/python/python-3.14-dev.yaml",
+      "repo": "python",
+      "tags": [
+        "3.14-dev",
+        "latest-dev"
+      ],
+      "test": "python-dev"
+    },
+    {
+      "name": "go-1.26",
+      "config": "images/go/go-1.26.yaml",
+      "repo": "go",
+      "tags": [
+        "1.26"
+      ],
+      "test": "go"
+    },
+    {
+      "name": "go-1.27",
+      "config": "images/go/go-1.27.yaml",
+      "repo": "go",
+      "tags": [
+        "1.27",
+        "latest"
+      ],
+      "test": "go",
+      "packages": [
+        "go-1.27"
+      ]
+    },
+    {
+      "name": "dotnet-sdk-10",
+      "config": "images/dotnet/dotnet-sdk-10.yaml",
+      "repo": "dotnet-sdk",
+      "tags": [
+        "10",
+        "latest"
+      ],
+      "test": "dotnet-sdk"
+    },
+    {
+      "name": "dotnet-aspnet-10",
+      "config": "images/dotnet/dotnet-aspnet-10.yaml",
+      "repo": "dotnet-aspnet",
+      "tags": [
+        "10",
+        "latest"
+      ],
+      "test": "dotnet-run"
+    },
+    {
+      "name": "dotnet-runtime-10",
+      "config": "images/dotnet/dotnet-runtime-10.yaml",
+      "repo": "dotnet-runtime",
+      "tags": [
+        "10",
+        "latest"
+      ],
+      "test": "dotnet-run"
+    }
+  ]
+}
