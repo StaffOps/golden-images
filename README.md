@@ -142,6 +142,27 @@ docker rm -f registry
 
 ## CI (`.github/workflows/build.yml`)
 
+**Each image is built and published individually.** `scripts/plan.sh` turns the diff into
+the list of affected images:
+
+| Changed | Rebuilt |
+|---|---|
+| `images/<family>/<x>.yaml` | that image |
+| `apks/<pkg>.yaml` | images listing `<pkg>` under `packages` in `catalog.json` |
+| `tests/<suite>.sh` | images using that suite |
+| a `catalog.json` entry | that image |
+| build scripts, `toolchain/`, `build.yml` | all images |
+| docs, Renovate config, helper scripts | nothing |
+
+The weekly schedule plans every image, but publishing is skipped when the image's **content
+fingerprint** is unchanged. The fingerprint covers the config, the catalog entry and the
+exact resolved apk set per arch, and is stored as the `dev.staffops.golden-image.fingerprint`
+annotation. When it is unchanged, the digest, tags and marker version stay the same, and
+scanners have nothing new to ingest. Set `FORCE_PUBLISH=1` to override.
+
+### Jobs
+
+
 1. **packages**: restores `dist/packages` from the Actions cache, builds what is missing
    for both archs (arm64 via QEMU), and hands the directory to the image jobs as an artifact.
 2. **image** (one job per image): apko build → smoke tests on amd64 → on `main` only,

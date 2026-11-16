@@ -110,25 +110,72 @@ MARKER_ARGS=(
 )
 
 mkdir -p dist/images "dist/sbom/$NAME"
+FP_FILE="dist/images/$NAME.${ARCHS//,/-}.fingerprint"   # per arch set: amd64-only and multi-arch builds differ
+FP_KEY="dev.staffops.golden-image.fingerprint"
+
+# Content fingerprint: config + catalog entry + exact resolved apk set per arch (from the SBOMs),
+# excluding the marker (its version is the build time). Equal fingerprint = same image content.
+fingerprint() {
+  local sboms=("dist/sbom/$NAME"/sbom-*.spdx.json) f
+  {
+    cat "$CONFIG"
+    jq -c --arg n "$NAME" '.images[] | select(.name == $n)' "$CATALOG"
+    for f in "${sboms[@]}"; do
+      [[ "$f" == *sbom-index.spdx.json ]] && continue
+      jq -r '.packages[] | select(([.externalRefs[]?.referenceLocator][0] // "") | startswith("pkg:apk/"))
+             | select(.name | startswith("staffops-golden-") | not)
+             | ([.externalRefs[]?.referenceLocator][0])' "$f"
+    done | sort
+  } | (sha256sum 2>/dev/null || shasum -a 256) | cut -d' ' -f1
+}
+
+build_local() {
+  log "build $NAME ($ARCHS)"
+  rm -f "dist/sbom/$NAME"/sbom-*.spdx.json
+  tc apko build "$CONFIG" "$REPO:${TAGS[0]}" "dist/images/$NAME.tar" --arch "$ARCHS" "${MARKER_ARGS[@]}" --sbom-path "dist/sbom/$NAME" >/dev/null
+  fingerprint > "$FP_FILE"
+  log "fingerprint $NAME $(cut -c1-16 "$FP_FILE")"
+}
+
+published_fingerprint() {
+  docker buildx imagetools inspect --raw "$REPO:${TAGS[0]}" 2>/dev/null \
+    | jq -r --arg k "$FP_KEY" '.annotations[$k] // empty' 2>/dev/null || true
+}
+
+set_output() { [[ -z "${GITHUB_OUTPUT:-}" ]] || echo "$1" >> "$GITHUB_OUTPUT"; }
+
 if [[ $PUBLISH -eq 1 ]]; then
+  [[ -f "$FP_FILE" ]] || build_local
+  FP="$(cat "$FP_FILE")"
+  OLD="$(published_fingerprint)"
+  if [[ "$FP" == "$OLD" && "${FORCE_PUBLISH:-0}" != 1 ]]; then
+    log "unchanged $NAME (fingerprint ${FP:0:16} already published): skipping publish/sign"
+    rm -f "dist/images/$NAME.digest"
+    set_output "published=false"
+    exit 0
+  fi
+  log "changed $NAME: published=${OLD:0:16}${OLD:+ }new=${FP:0:16}"
   refs=()
   for t in "${TAGS[@]}"; do
     refs+=("$REPO:$t")
     [[ -z "$SUFFIX" ]] || refs+=("$REPO:$t-$SUFFIX")
   done
-  mkdir -p "dist/sbom/$NAME"
   log "publish $NAME -> ${refs[*]} ($ARCHS)"
   # apko prints the multi-arch index digest ref on stdout.
-  tc apko publish "$CONFIG" "${refs[@]}" --arch "$ARCHS" "${MARKER_ARGS[@]}" --sbom-path "dist/sbom/$NAME" \
+  tc apko publish "$CONFIG" "${refs[@]}" --arch "$ARCHS" "${MARKER_ARGS[@]}" \
+    --annotations "$FP_KEY:$FP" --sbom-path "dist/sbom/$NAME" \
     | tail -n1 | tee "dist/images/$NAME.digest"
+  set_output "published=true"
 else
-  log "build $NAME ($ARCHS)"
-  tc apko build "$CONFIG" "$REPO:${TAGS[0]}" "dist/images/$NAME.tar" --arch "$ARCHS" "${MARKER_ARGS[@]}" --sbom-path "dist/sbom/$NAME" >/dev/null
+  build_local
   docker load -q < "dist/images/$NAME.tar" >&2
   # apko tags loaded images as <ref>-<arch>; give the host arch the plain tag too.
   host="$(oci_arch "$(host_apk_arch)")"
   if docker image inspect "$REPO:${TAGS[0]}-$host" >/dev/null 2>&1; then
     docker tag "$REPO:${TAGS[0]}-$host" "$REPO:${TAGS[0]}"
   fi
+  OLD="$(published_fingerprint)"
+  if [[ -n "$OLD" && "$OLD" == "$(cat "$FP_FILE")" ]]; then log "$NAME: same content as published $REPO:${TAGS[0]}"
+  else log "$NAME: content differs from published $REPO:${TAGS[0]}${OLD:+ }${OLD:-(no fingerprint published yet)}"; fi
   echo "$REPO:${TAGS[0]}"
 fi
