@@ -7,7 +7,7 @@ Operational guide for anyone (human or agent) changing this repo. The overview i
 ## Layout
 
 ```
-apks/                 melange specs (1 YAML = 1 APK). Only what Alpine v3.24 lacks.
+apks/                 melange specs (1 YAML = 1 APK): what Alpine v3.24 lacks (go-1.27) or ships late (.NET, from Microsoft)
 images/<family>/      apko configs (1 YAML = 1 image): base, node, python, go, dotnet
 catalog.json          source of truth: image name → config, repo, tags, test suite, packages (+ optional eol)
 tests/<suite>.sh      smoke checks, sourced by scripts/test-image.sh (host-side docker run)
@@ -58,12 +58,34 @@ signed with its own throwaway key. That is what links every derived image's SBOM
 golden image. CI pins one version per job, so the image it tests and the one it
 publishes carry the same marker.
 
+## Why .NET comes from Microsoft, not Alpine
+
+Measured on 2026-11-16 for .NET 10: Alpine 3.24-stable usually packages a runtime patch
+within 2 days of Microsoft (max 7). However, it **skipped** security releases 10.0.5 and
+10.0.11, leaving 30 days on a runtime with known CVEs. Its SDK is also stuck on an older
+feature band (10.0.3xx while Microsoft is on 10.0.4xx). `apks/msft-*` repackage
+Microsoft's official linux-musl tarballs (sha512 from `releases.json`) into
+`/usr/share/dotnet`. The three packages are self-contained and mutually exclusive: each
+image installs exactly one of them.
+
+### .NET CVE detection (do not remove)
+
+Our apk names (`msft-*`) are unknown to vulnerability databases, and Alpine's secdb is
+sparse for .NET anyway. Each `msft-*` package writes `/usr/share/dotnet/staffops-runtime.deps.json`,
+which declares the bundled shared frameworks as the official NuGet runtime packs
+(`Microsoft.NETCore.App.Runtime.linux-musl-<arch>@<ver>`), with versions read from the tarball.
+Trivy skips files owned by OS packages, so each dotnet image re-exposes the file via an
+apko `hardlink` at `/usr/share/dotnet-sbom/runtime.deps.json`. Result: `trivy image` (and
+Dependency-Track) match .NET runtime CVEs from GitHub advisories, on the golden image and on
+every image built FROM it. Verified: declaring 10.0.1 gives 35 CVEs, 10.0.15 gives 0.
+
 ## Bumping versions
 
 - Alpine package (Node, Python, Go 1.26, .NET): the weekly CI rebuild picks up patch
   releases automatically. To change a minor, edit the `pkg=~X` constraint in the image YAML.
-- melange package: bump `package.version`, reset `epoch: 0`, and update both
-  `expected-sha256` values (for GitHub releases, `gh release view <tag> -R <repo> --json assets`
+- melange package: bump `package.version`, reset `epoch: 0`, and run
+  `scripts/update-checksums.sh apks/<pkg>.yaml` (Renovate does both). To do it by hand, update both
+  `expected-sha256`/`expected-sha512` values (for GitHub releases, `gh release view <tag> -R <repo> --json assets`
   shows the digests; for Go, use `https://go.dev/dl/?mode=json`). Then run
   `scripts/golden.sh full <image>`.
 - When Alpine stable ships Go 1.27, delete `apks/go-1.27.yaml`, switch the image to

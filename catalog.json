@@ -118,7 +118,10 @@
         "10",
         "latest"
       ],
-      "test": "dotnet-sdk"
+      "test": "dotnet-sdk",
+      "packages": [
+        "msft-dotnet-sdk-10"
+      ]
     },
     {
       "name": "dotnet-aspnet-10",
@@ -128,7 +131,10 @@
         "10",
         "latest"
       ],
-      "test": "dotnet-run"
+      "test": "dotnet-run",
+      "packages": [
+        "msft-aspnetcore-runtime-10"
+      ]
     },
     {
       "name": "dotnet-runtime-10",
@@ -138,7 +144,10 @@
         "10",
         "latest"
       ],
-      "test": "dotnet-run"
+      "test": "dotnet-run",
+      "packages": [
+        "msft-dotnet-runtime-10"
+      ]
     }
   ]
 }

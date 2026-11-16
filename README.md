@@ -19,9 +19,9 @@ images/**/*.yaml ──apko──◀─────┘  + Alpine v3.24 ──▶
 | `ghcr.io/staffops/node` | `22` `24` `26` `lts` `latest` + `-dev` variants | runtime: `node` only, no npm. `-dev`: npm, pnpm, yarn, node-gyp toolchain |
 | `ghcr.io/staffops/python` | `3.14` `latest` + `-dev` variants | runtime: no pip. `-dev`: pip, uv, C toolchain |
 | `ghcr.io/staffops/go` | `1.27` `latest`, `1.26` | build images; ship binaries on `static` |
-| `ghcr.io/staffops/dotnet-sdk` | `10` `latest` | .NET SDK |
-| `ghcr.io/staffops/dotnet-aspnet` | `10` `latest` | ASP.NET Core runtime, port 8080 |
-| `ghcr.io/staffops/dotnet-runtime` | `10` `latest` | .NET runtime |
+| `ghcr.io/staffops/dotnet-sdk` | `10` `latest` | .NET SDK (official Microsoft musl build) |
+| `ghcr.io/staffops/dotnet-aspnet` | `10` `latest` | ASP.NET Core runtime, port 8080 (official Microsoft musl build) |
+| `ghcr.io/staffops/dotnet-runtime` | `10` `latest` | .NET runtime (official Microsoft musl build) |
 
 Every published tag also gets a dated immutable twin (`24-20261116`). In production, pin by
 digest. Conventions:
@@ -149,6 +149,20 @@ docker rm -f registry
 
 It runs on PRs (build + test, no publish), on push to `main`, weekly on Monday (to pick up
 Alpine security fixes) and manually with a `target`.
+
+## Automatic updates
+
+| What | How it updates |
+|---|---|
+| Alpine packages (Node, Python, Go 1.26, libs) | weekly rebuild picks up patch releases, no PR |
+| .NET 10 runtime/ASP.NET/SDK, Go 1.27 (our melange packages) | Renovate PR → `checksums` workflow recomputes hashes on the branch → CI builds + tests |
+| melange / apko toolchain | Renovate PR (+ checksums from the signed release `checksums.txt`) |
+| Alpine stable branch (`v3.24` → next) | one grouped Renovate PR touching every image (node-22 excluded) |
+| GitHub Actions | weekly grouped Renovate PR, pinned by SHA |
+
+Every PR body says why (release notes, security context). Nothing is automerged.
+Requires the Renovate GitHub App on the repo. `scripts/update-checksums.sh` does the
+checksum step locally too.
 
 ## Add something
 

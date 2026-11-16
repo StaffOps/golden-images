@@ -1,14 +1,17 @@
 # .NET 10 SDK build image (root, shell).
 contents:
+  keyring:
+    - ./dist/packages/melange.rsa.pub
   repositories:
     - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
     - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
+    - '@local /work/dist/packages'
   packages:
     - alpine-baselayout-data
     - alpine-release
     - ca-certificates-bundle
     - tzdata
-    - dotnet10-sdk
+    - msft-dotnet-sdk-10@local
     - bash
     - busybox
     - git
@@ -25,8 +28,15 @@ accounts:
       homedir: /home/nonroot
   run-as: "0"
 work-dir: /src
+paths:
+  # Scanner hint, outside any apk: Trivy skips files owned by OS packages, so the packaged
+  # deps.json (NuGet runtime packs) is exposed again via a hardlink. Trivy and Dependency-Track
+  # then match .NET runtime CVEs (GitHub advisories) on this image and on every image built FROM it.
+  - path: /usr/share/dotnet-sbom/runtime.deps.json
+    type: hardlink
+    source: /usr/share/dotnet/staffops-runtime.deps.json
 environment:
-  DOTNET_ROOT: /usr/lib/dotnet
+  DOTNET_ROOT: /usr/share/dotnet
   DOTNET_CLI_TELEMETRY_OPTOUT: "1"
   DOTNET_NOLOGO: "1"
   DOTNET_RUNNING_IN_CONTAINER: "true"
