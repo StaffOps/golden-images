@@ -8,7 +8,7 @@
 package:
   name: msft-dotnet-sdk-10
   version: 10.0.404
-  epoch: 0
+  epoch: 1
   description: ".NET 10 SDK incl. runtimes (official Microsoft linux-musl build)"
   copyright:
     - license: MIT

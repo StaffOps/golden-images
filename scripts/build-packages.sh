@@ -40,16 +40,22 @@ for arch in "${ARCH_LIST[@]}"; do
   for spec in "${SPECS[@]}"; do
     n="$(spec_field "$spec" name)"
     target="$PKG_DIR/$arch/${WANTED[$n]}"
-    if [[ $FORCE -eq 0 && -f "$target" ]]; then
+    # The cache key is the spec content, not just name-version-epoch: editing a spec without
+    # bumping epoch must still rebuild (and must never reuse a stale apk from the CI cache).
+    stamp="$PKG_DIR/$arch/.$n.spec.sha256"
+    sum="$( (sha256sum 2>/dev/null || shasum -a 256) < "$spec" | cut -d' ' -f1)"
+    if [[ $FORCE -eq 0 && -f "$target" && "$(cat "$stamp" 2>/dev/null)" == "$sum" ]]; then
       log "cached  $arch ${WANTED[$n]}"
       continue
     fi
+    rm -f "$target"
     log "build   $arch ${WANTED[$n]}"
     tc melange build "$spec" \
       --arch "$arch" \
       --signing-key "$PKG_DIR/melange.rsa" \
       --out-dir "$PKG_DIR" \
       --source-dir "./apks"
+    echo "$sum" > "$stamp"
   done
 
   # Prune: drop older versions and packages whose spec was deleted.
@@ -61,6 +67,10 @@ for arch in "${ARCH_LIST[@]}"; do
       log "prune   $arch $f"
       rm -f "$apk"
     fi
+  done
+  for st in "$PKG_DIR/$arch"/.*.spec.sha256; do
+    n="$(basename "$st" .spec.sha256)"; n="${n#.}"
+    [[ -n "${WANTED[$n]:-}" ]] || rm -f "$st"
   done
   apks=("$PKG_DIR/$arch"/*.apk)
   shopt -u nullglob

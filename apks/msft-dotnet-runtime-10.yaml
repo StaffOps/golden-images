@@ -8,7 +8,7 @@
 package:
   name: msft-dotnet-runtime-10
   version: 10.0.15
-  epoch: 0
+  epoch: 1
   description: ".NET 10 runtime (official Microsoft linux-musl build)"
   copyright:
     - license: MIT
