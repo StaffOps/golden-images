@@ -66,6 +66,24 @@ pipeline:
       mkdir -p "${{targets.destdir}}/usr/share" "${{targets.destdir}}/usr/bin"
       mv dotnet "${{targets.destdir}}/usr/share/dotnet"
       ln -s /usr/share/dotnet/dotnet "${{targets.destdir}}/usr/bin/dotnet"
+      # Vulnerability-scanner hint. Our apk names (msft-*) are unknown to CVE databases, so
+      # declare the bundled shared frameworks as their official NuGet runtime packs. Trivy and
+      # Dependency-Track match those against GitHub advisories. The dotnet host ignores this
+      # file (it only reads shared/<fw>/<ver>/<fw>.deps.json).
+      d="${{targets.destdir}}/usr/share/dotnet"
+      rid=x64; [ "${{build.arch}}" = "aarch64" ] && rid=arm64
+      targets=""; libs=""
+      for fw in Microsoft.NETCore.App Microsoft.AspNetCore.App; do
+        [ -d "$d/shared/$fw" ] || continue
+        v="$(ls "$d/shared/$fw" | sort -V | tail -n1)"
+        id="$fw.Runtime.linux-musl-$rid/$v"
+        targets="$targets${targets:+,}\"$id\": {\"runtime\": {\"$fw.dll\": {}}}"
+        libs="$libs${libs:+,}\"$id\": {\"type\": \"package\", \"serviceable\": true}"
+      done
+      printf '{"runtimeTarget":{"name":".NETCoreApp,Version=v10.0/linux-musl-%s"},"targets":{".NETCoreApp,Version=v10.0/linux-musl-%s":{%s}},"libraries":{%s}}\n' \
+        "$rid" "$rid" "$targets" "$libs" > "$d/staffops-runtime.deps.json"
+      cat "$d/staffops-runtime.deps.json"
+
       # Smoke test with the freshly installed files.
       DOTNET_ROOT="${{targets.destdir}}/usr/share/dotnet" \
         "${{targets.destdir}}/usr/share/dotnet/dotnet" --info

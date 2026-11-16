@@ -68,6 +68,17 @@ Microsoft's official linux-musl tarballs (sha512 from `releases.json`) into
 `/usr/share/dotnet`. The three packages are self-contained and mutually exclusive: each
 image installs exactly one of them.
 
+### .NET CVE detection (do not remove)
+
+Our apk names (`msft-*`) are unknown to vulnerability databases, and Alpine's secdb is
+sparse for .NET anyway. Each `msft-*` package writes `/usr/share/dotnet/staffops-runtime.deps.json`,
+which declares the bundled shared frameworks as the official NuGet runtime packs
+(`Microsoft.NETCore.App.Runtime.linux-musl-<arch>@<ver>`), with versions read from the tarball.
+Trivy skips files owned by OS packages, so each dotnet image re-exposes the file via an
+apko `hardlink` at `/usr/share/dotnet-sbom/runtime.deps.json`. Result: `trivy image` (and
+Dependency-Track) match .NET runtime CVEs from GitHub advisories, on the golden image and on
+every image built FROM it. Verified: declaring 10.0.1 gives 35 CVEs, 10.0.15 gives 0.
+
 ## Bumping versions
 
 - Alpine package (Node, Python, Go 1.26, .NET): the weekly CI rebuild picks up patch
