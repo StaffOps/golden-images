@@ -79,6 +79,16 @@ apko `hardlink` at `/usr/share/dotnet-sbom/runtime.deps.json`. Result: `trivy im
 Dependency-Track) match .NET runtime CVEs from GitHub advisories, on the golden image and on
 every image built FROM it. Verified: declaring 10.0.1 gives 35 CVEs, 10.0.15 gives 0.
 
+## Per-image builds and publish skip
+
+- `scripts/plan.sh <base> [head]` maps changed files to images (see README). It replaces
+  the reference repo's hand-maintained `triggers.yml`, using `catalog.json` `packages`/`test`.
+  When adding a file type that influences an image, teach `plan.sh` about it.
+- `build-image.sh --publish` compares the content fingerprint with the annotation on the
+  published image and exits with `published=false` when they are equal. Sign/attest steps
+  run only when `published == 'true'`. The fingerprint excludes the marker (its version is
+  the build time) and depends on the arch set (`dist/images/<name>.<archs>.fingerprint`).
+
 ## Bumping versions
 
 - Alpine package (Node, Python, Go 1.26, .NET): the weekly CI rebuild picks up patch
