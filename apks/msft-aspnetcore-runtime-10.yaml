@@ -1,0 +1,71 @@
+# ASP.NET Core 10 runtime incl. .NET runtime (official Microsoft linux-musl build).
+# Why custom instead of Alpine's dotnet10-*: Alpine stable skipped security releases
+# 10.0.5 and 10.0.11 (30 days on a runtime with known CVEs) and keeps the SDK on an older
+# feature band. Microsoft's musl tarballs ship the same day as the release.
+# Source of truth for versions and hashes: the releases.json metadata published by Microsoft:
+# https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json
+# renovate: datasource=dotnet-version depName=aspnetcore-runtime
+package:
+  name: msft-aspnetcore-runtime-10
+  version: 10.0.15
+  epoch: 0
+  description: "ASP.NET Core 10 runtime incl. .NET runtime (official Microsoft linux-musl build)"
+  copyright:
+    - license: MIT
+  dependencies:
+    runtime:
+      - ca-certificates-bundle
+      - icu-libs
+      - krb5-libs
+      - libgcc
+      - libssl3
+      - libstdc++
+      - tzdata
+      - zlib
+  options:
+    # .NET dlopen()s ICU/OpenSSL instead of linking them; the deps above are explicit.
+    no-depends: true
+    no-provides: true
+
+environment:
+  contents:
+    repositories:
+      - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - icu-libs
+      - libgcc
+      - libssl3
+      - libstdc++
+      - zlib
+
+pipeline:
+  - runs: mkdir -p dotnet
+
+  - assertions:
+      required-steps: 1
+    pipeline:
+      - uses: fetch
+        if: ${{build.arch}} == 'x86_64'
+        with:
+          uri: https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${{package.version}}/aspnetcore-runtime-${{package.version}}-linux-musl-x64.tar.gz
+          expected-sha512: 0c4608259c99236bcb860c145b8794c72c6817d01d4ed0ad2132b78cd90e13c6527341edb787b38d9e0382d806b61bfbb170b9951cec68d1043840ff176fa90b
+          strip-components: 0
+          directory: dotnet
+      - uses: fetch
+        if: ${{build.arch}} == 'aarch64'
+        with:
+          uri: https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/${{package.version}}/aspnetcore-runtime-${{package.version}}-linux-musl-arm64.tar.gz
+          expected-sha512: fc11fb386be841f4b1d84b1a95e68bb95177fad228e56e215a5cd196ef2460f3fb354c8f2f48d132aa71f676829aaf403e2f546fe5e20c2d38f097be0c64e7b9
+          strip-components: 0
+          directory: dotnet
+
+  - runs: |
+      set -eu
+      mkdir -p "${{targets.destdir}}/usr/share" "${{targets.destdir}}/usr/bin"
+      mv dotnet "${{targets.destdir}}/usr/share/dotnet"
+      ln -s /usr/share/dotnet/dotnet "${{targets.destdir}}/usr/bin/dotnet"
+      # Smoke test with the freshly installed files.
+      DOTNET_ROOT="${{targets.destdir}}/usr/share/dotnet" \
+        "${{targets.destdir}}/usr/share/dotnet/dotnet" --info

@@ -43,7 +43,7 @@ from NodeSource on top of `python:3.11-slim` so that it can run `npm i -g @anthr
 | Node.js | 22, 24, 26 | 22, 24, 26 | 22 comes from the Alpine v3.22 branch: no newer branch ships it, and mixing branches breaks ABI. 24 = `nodejs`, 26 = `nodejs-current` from v3.24. 26 has been Active LTS since Oct 2026 (`lts`/`latest` tags) |
 | Go | latest + LTS if one exists | 1.27 + 1.26 | Go has no LTS; upstream supports the last two minors. 1.26 is in use by a private Go service and comes from Alpine; 1.27 is a melange package from go.dev |
 | Python | LTS + latest, or latest only | 3.14 | Python has no LTS. 3.14 is the newest in Alpine. 3.15 (Oct 2026) is not packaged by Alpine yet |
-| .NET | 8 and 10 | 10 (sdk, aspnet, runtime) | Ships in Alpine v3.24 community, so no melange package is needed (unlike BDC). 8 was dropped: end of support on 2026-11-10, so the otel-libs `:8.0` examples should move to 10 |
+| .NET | 8 and 10 | 10 (sdk, aspnet, runtime) | Repackaged from Microsoft's official musl tarballs (like BDC): Alpine stable skipped 2 security releases and lags on the SDK band. 8 was dropped: end of support on 2026-11-10, so the otel-libs `:8.0` examples should move to 10 |
 
 ## Migration notes
 

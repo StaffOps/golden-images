@@ -1,0 +1,71 @@
+# .NET 10 runtime (official Microsoft linux-musl build).
+# Why custom instead of Alpine's dotnet10-*: Alpine stable skipped security releases
+# 10.0.5 and 10.0.11 (30 days on a runtime with known CVEs) and keeps the SDK on an older
+# feature band. Microsoft's musl tarballs ship the same day as the release.
+# Source of truth for versions and hashes: the releases.json metadata published by Microsoft:
+# https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json
+# renovate: datasource=dotnet-version depName=dotnet-runtime
+package:
+  name: msft-dotnet-runtime-10
+  version: 10.0.15
+  epoch: 0
+  description: ".NET 10 runtime (official Microsoft linux-musl build)"
+  copyright:
+    - license: MIT
+  dependencies:
+    runtime:
+      - ca-certificates-bundle
+      - icu-libs
+      - krb5-libs
+      - libgcc
+      - libssl3
+      - libstdc++
+      - tzdata
+      - zlib
+  options:
+    # .NET dlopen()s ICU/OpenSSL instead of linking them; the deps above are explicit.
+    no-depends: true
+    no-provides: true
+
+environment:
+  contents:
+    repositories:
+      - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - icu-libs
+      - libgcc
+      - libssl3
+      - libstdc++
+      - zlib
+
+pipeline:
+  - runs: mkdir -p dotnet
+
+  - assertions:
+      required-steps: 1
+    pipeline:
+      - uses: fetch
+        if: ${{build.arch}} == 'x86_64'
+        with:
+          uri: https://builds.dotnet.microsoft.com/dotnet/Runtime/${{package.version}}/dotnet-runtime-${{package.version}}-linux-musl-x64.tar.gz
+          expected-sha512: dca559d4265deac0a1f16f9f4e31a75f2210a71ff6f62b0131cf0dabdececca193c8a7eaf5a1bf4291b44b0afb13953b24ba1d8e58acd0bf80eb3f148c23594e
+          strip-components: 0
+          directory: dotnet
+      - uses: fetch
+        if: ${{build.arch}} == 'aarch64'
+        with:
+          uri: https://builds.dotnet.microsoft.com/dotnet/Runtime/${{package.version}}/dotnet-runtime-${{package.version}}-linux-musl-arm64.tar.gz
+          expected-sha512: 847e3d3992148fa451f720a220776957c57641ddf2d7833eb9552ec266361e3c21f103867a6780796c50bbadbf8cec21c421d3bacd9f93da73d3b1e71f11b8af
+          strip-components: 0
+          directory: dotnet
+
+  - runs: |
+      set -eu
+      mkdir -p "${{targets.destdir}}/usr/share" "${{targets.destdir}}/usr/bin"
+      mv dotnet "${{targets.destdir}}/usr/share/dotnet"
+      ln -s /usr/share/dotnet/dotnet "${{targets.destdir}}/usr/bin/dotnet"
+      # Smoke test with the freshly installed files.
+      DOTNET_ROOT="${{targets.destdir}}/usr/share/dotnet" \
+        "${{targets.destdir}}/usr/share/dotnet/dotnet" --info

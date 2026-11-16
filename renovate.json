@@ -1,0 +1,82 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests", ":dependencyDashboard"],
+  "description": "Version bumps for everything pinned in golden-images. Checksums are recomputed by .github/workflows/checksums.yml on the PR branch.",
+  "timezone": "America/Sao_Paulo",
+  "automerge": false,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "melange specs that carry a `# renovate:` hint above package/name/version (.NET, Go)",
+      "managerFilePatterns": ["/^apks/.+\\.yaml$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\npackage:\\n  name: \\S+\\n  version: \"?(?<currentValue>[^\"\\s]+)\"?"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "melange / apko versions in the toolchain image",
+      "managerFilePatterns": ["/^toolchain/Dockerfile$/"],
+      "matchStrings": ["ARG (?<depName>MELANGE|APKO)_VERSION=(?<currentValue>\\S+)"],
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "chainguard-dev/{{{lowercase depName}}}",
+      "depNameTemplate": "{{{lowercase depName}}}",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Alpine branch (vX.Y) used by images and package build environments. node-22 is pinned to v3.22 on purpose.",
+      "managerFilePatterns": [
+        "/^images/(base|python|go|dotnet)/.+\\.yaml$/",
+        "/^images/node/node-2[4-9].*\\.yaml$/",
+        "/^apks/.+\\.yaml$/"
+      ],
+      "matchStrings": ["dl-cdn\\.alpinelinux\\.org/alpine/v(?<currentValue>\\d+\\.\\d+)/"],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "alpine",
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)$"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": ".NET 10 servicing (runtime + ASP.NET Core + SDK ship together on Patch Tuesday)",
+      "matchDatasources": ["dotnet-version"],
+      "allowedVersions": "/^10\\./",
+      "groupName": ".NET 10",
+      "prBodyNotes": [
+        "**Why:** Microsoft .NET 10 servicing release (usually includes security fixes). Our images use Microsoft's official linux-musl builds, so this lands the same week instead of waiting for Alpine.",
+        "Release notes: https://github.com/dotnet/core/tree/main/release-notes/10.0 · metadata/hashes: https://builds.dotnet.microsoft.com/dotnet/release-metadata/10.0/releases.json",
+        "Checksums are recomputed automatically by the `checksums` workflow; CI then builds and smoke-tests the .NET images."
+      ]
+    },
+    {
+      "description": "Go custom toolchain package stays on its minor; a new minor is a new image",
+      "matchDatasources": ["golang-version"],
+      "allowedVersions": "/^1\\.27\\./",
+      "prBodyNotes": [
+        "**Why:** Go 1.27 patch release (security and bug fixes). Release notes: https://go.dev/doc/devel/release#go1.27.minor"
+      ]
+    },
+    {
+      "description": "Build toolchain",
+      "matchPackageNames": ["melange", "apko"],
+      "groupName": "build toolchain (melange/apko)",
+      "prBodyNotes": ["**Why:** keep the image build toolchain current. CI rebuilds every package and image with the new version before merge."]
+    },
+    {
+      "description": "Alpine stable branch bump touches every image: one grouped PR, never automerged",
+      "matchDepNames": ["alpine"],
+      "groupName": "Alpine stable branch",
+      "prBodyNotes": [
+        "**Why:** a new Alpine stable branch is available. It brings newer package versions and longer security support. Release notes: https://alpinelinux.org/releases/",
+        "Every image is rebuilt and smoke-tested by CI. Check package version jumps (nodejs-current, python3, go) before merging."
+      ]
+    },
+    {
+      "description": "GitHub Actions: weekly, grouped",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "schedule": ["before 9am on monday"]
+    }
+  ]
+}

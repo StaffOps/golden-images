@@ -1,0 +1,47 @@
+name: checksums
+
+# Renovate bumps only the version. This recomputes the pinned checksums on the PR branch,
+# commits them, and re-dispatches the build so the PR shows a real result.
+# (Commits pushed with GITHUB_TOKEN don't trigger `pull_request` runs, but
+# workflow_dispatch is allowed.)
+on:
+  pull_request:
+    paths:
+      - "apks/**"
+      - "toolchain/Dockerfile"
+
+permissions:
+  contents: read
+
+jobs:
+  fix:
+    if: github.event.pull_request.head.repo.full_name == github.repository && startsWith(github.head_ref, 'renovate/')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write   # push the checksum commit to the Renovate branch
+      actions: write    # dispatch the build workflow on that branch
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Recompute checksums for changed specs
+        id: update
+        run: |
+          changed=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- 'apks/*.yaml' toolchain/Dockerfile)
+          echo "changed: $changed"
+          [ -n "$changed" ] || exit 0
+          scripts/update-checksums.sh $changed
+          if git diff --quiet; then echo "pushed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: update pinned checksums"
+          git push
+          echo "pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Re-run build on the updated branch
+        if: steps.update.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build.yml --ref "${{ github.head_ref }}"

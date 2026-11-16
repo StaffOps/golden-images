@@ -1,6 +1,7 @@
 # Go 1.27 toolchain from the official go.dev distribution.
 # Why custom: Alpine v3.24 ships go 1.26; go 1.27 exists only in edge.
 # Remove this package once the Alpine stable branch we pin ships go 1.27.
+# renovate: datasource=golang-version depName=go
 package:
   name: go-1.27
   version: 1.27.4

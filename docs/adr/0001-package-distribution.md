@@ -7,8 +7,9 @@
 ## Context
 
 The golden images are built with apko from Alpine packages. A few things are not in the
-Alpine stable branch we pin (v3.24), so we build them as APKs with melange. Today this is
-`go-1.27`, which only exists in Alpine edge.
+Alpine stable branch we pin (v3.24), so we build them as APKs with melange. Today these are
+`go-1.27` (only in Alpine edge) and the .NET 10 runtime, ASP.NET Core and SDK, repackaged from
+Microsoft because Alpine stable skips and delays security releases (see AGENTS.md).
 
 The reference design (BDC `custom-packages` and `custom-images`) uses two repos. Packages
 are published to an external APK repository (an S3 bucket) with a long-lived signing key.
@@ -55,7 +56,7 @@ repo. Nothing outside installs our APKs with `apk add`.
 
 - Positive: zero infra for packages and no secrets. One pipeline, and the whole path can be
   reproduced locally with `scripts/golden.sh full <family>`.
-- Positive: a cold cache costs about 2 minutes (fetch + repackage of 1 package × 2 archs);
+- Positive: a cold cache costs about 2 minutes (fetch + repackage of 4 packages × 2 archs, dominated by the ~200 MB SDK);
   a warm cache costs under a second.
 - Negative: our APKs cannot be installed with `apk add` outside the images. An app that
   needs one of them must `FROM` a golden image that includes it.
