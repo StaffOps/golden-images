@@ -82,6 +82,10 @@ cosign verify-attestation --type spdxjson ghcr.io/staffops/node:24 \
 
 ### Verify a signature
 
+Signatures and SBOM attestations use the Sigstore bundle format (OCI referrers), so
+verification needs **cosign v3+**: cosign v2 reports "no signatures found". The same applies to admission
+policies (for example Kyverno `verifyImages`), which must support the bundle format.
+
 ```bash
 cosign verify ghcr.io/staffops/node:24 \
   --certificate-identity-regexp '^https://github.com/StaffOps/golden-images/' \
