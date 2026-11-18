@@ -25,6 +25,16 @@
     },
     {
       "customType": "regex",
+      "description": "crane (go-containerregistry) version in the toolchain image",
+      "managerFilePatterns": ["/^toolchain/Dockerfile$/"],
+      "matchStrings": ["ARG CRANE_VERSION=(?<currentValue>\\S+)"],
+      "datasourceTemplate": "github-releases",
+      "packageNameTemplate": "google/go-containerregistry",
+      "depNameTemplate": "crane",
+      "extractVersionTemplate": "^v(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
       "description": "Alpine branch (vX.Y) used by images and package build environments. node-22 is pinned to v3.22 on purpose.",
       "managerFilePatterns": [
         "/^images/(base|python|go|dotnet)/.+\\.yaml$/",
@@ -59,8 +69,8 @@
     },
     {
       "description": "Build toolchain",
-      "matchPackageNames": ["melange", "apko"],
-      "groupName": "build toolchain (melange/apko)",
+      "matchDepNames": ["melange", "apko", "crane"],
+      "groupName": "build toolchain (melange/apko/crane)",
       "prBodyNotes": ["**Why:** keep the image build toolchain current. CI rebuilds every package and image with the new version before merge."]
     },
     {

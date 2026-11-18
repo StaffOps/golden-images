@@ -50,6 +50,16 @@ update_toolchain() {
       sed -i.bak -E "s/^(ARG ${tool^^}_SHA256_${arch}=).*/\1$sum/" "$f" && rm -f "$f.bak"
     done
   done
+  # crane: go-containerregistry release, assets named go-containerregistry_Linux_<x86_64|arm64>.
+  ver="$(sed -nE 's/^ARG CRANE_VERSION=(.+)$/\1/p' "$f")"
+  sums="$(curl -fsSL --retry 3 "https://github.com/google/go-containerregistry/releases/download/v$ver/checksums.txt")"
+  for arch in amd64 arm64; do
+    local carch=x86_64; [[ "$arch" == arm64 ]] && carch=arm64
+    sum="$(awk -v n="go-containerregistry_Linux_${carch}.tar.gz" '$2 == n {print $1}' <<< "$sums")"
+    [[ -n "$sum" ]] || { echo "no checksum for crane $ver $arch" >&2; exit 1; }
+    log "$f: crane $ver $arch"
+    sed -i.bak -E "s/^(ARG CRANE_SHA256_${arch}=).*/\1$sum/" "$f" && rm -f "$f.bak"
+  done
 }
 
 targets=("$@")

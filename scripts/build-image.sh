@@ -5,6 +5,9 @@
 #   scripts/build-image.sh <name> [--arch amd64,arm64]            # build + docker load (host arch default)
 #   scripts/build-image.sh <name> --publish [--suffix 20261116]   # push multi-arch to $REGISTRY, print digest
 #
+# --publish pushes the image already built for the same --arch set (dist/images/<name>.<archs>.oci),
+# byte for byte, with crane; it builds first only if that image is missing. It never rebuilds.
+#
 # Images that consume local packages need scripts/build-packages.sh first (same archs).
 source "$(dirname "$0")/lib.sh"
 cd "$ROOT"
@@ -155,33 +158,113 @@ MARKER_ARGS=(
 )
 
 mkdir -p dist/images "dist/sbom/$NAME"
-FP_FILE="dist/images/$NAME.${ARCHS//,/-}.fingerprint"   # per arch set: amd64-only and multi-arch builds differ
+# Everything is per arch set: an amd64-only build and a multi-arch build are different images.
+ASET="${ARCHS//,/-}"
+TAR="dist/images/$NAME.$ASET.tar"          # apko output, docker-loadable
+LAYOUT="dist/images/$NAME.$ASET.oci"       # the same blobs as an OCI layout: what gets pushed
+FP_FILE="dist/images/$NAME.$ASET.fingerprint"
 FP_KEY="dev.staffops.golden-image.fingerprint"
 
-# Content fingerprint: config + catalog entry + exact resolved apk set per arch (from the SBOMs),
-# excluding the marker (its version is the build time). The marker's os-release carries the
-# Alpine point release, so that goes in explicitly. Equal fingerprint = same image content.
-fingerprint() {
-  local sboms=("dist/sbom/$NAME"/sbom-*.spdx.json) f
+# --- Build once, publish those exact bytes ----------------------------------------------
+# The image that is tested and scanned is the image that is published: --publish never
+# rebuilds, it pushes $LAYOUT with crane, so the index digest, the per-arch manifests and the
+# SBOM (which names the index digest) all stay identical. The content fingerprint is
+# therefore an input of the build (an index annotation), computed from the package set apko
+# resolves before building and checked against the SBOMs after.
+
+# "arch name version" of every package apko resolves for the config, marker excluded from the
+# list. The marker must take part in the resolution (it provides /bin/sh on runtime images), and
+# show-packages has no --package-append, so resolve a copy of the config with the marker added.
+resolved_packages() {
+  local a al cfg="dist/meta-spec/$NAME.apko.yaml"
+  yq ".contents.repositories += [\"/work/$META_DIR\"] | .contents.keyring += [\"$META_DIR/meta.rsa.pub\"]
+      | .contents.packages += [\"$MARKER\"]" "$CONFIG" > "$cfg"
+  IFS=',' read -r -a al <<< "$ARCHS"
+  for a in "${al[@]}"; do
+    tc apko show-packages "$cfg" --arch "$a" --format '{{ .Name }} {{ .Version }}' 2>/dev/null \
+      | grep -v "^$MARKER " | sed "s/^/$(apk_arch "$a") /"
+  done | sort
+}
+
+# The same list, read from the SBOMs of the image that was actually built.
+sbom_packages() {
+  local f arch
+  for f in "dist/sbom/$NAME"/sbom-*.spdx.json; do
+    [[ "$f" == *sbom-index.spdx.json ]] && continue
+    arch="$(basename "$f" .spdx.json)"; arch="${arch#sbom-}"
+    jq -r --arg a "$arch" '.packages[]
+      | select(([.externalRefs[]?.referenceLocator][0] // "") | startswith("pkg:apk/"))
+      | select(.name | startswith("staffops-golden-") | not)
+      | "\($a) \(.name) \(.versionInfo)"' "$f"
+  done | sort
+}
+
+# Content fingerprint: config + catalog entry + Alpine release (it is in the marker's
+# os-release, and the marker is excluded) + the exact package set per arch.
+fingerprint() { # resolved packages
   {
     cat "$CONFIG"
     jq -c --arg n "$NAME" '.images[] | select(.name == $n)' "$CATALOG"
     echo "alpine-version $ALPINE_VERSION"
-    for f in "${sboms[@]}"; do
-      [[ "$f" == *sbom-index.spdx.json ]] && continue
-      jq -r '.packages[] | select(([.externalRefs[]?.referenceLocator][0] // "") | startswith("pkg:apk/"))
-             | select(.name | startswith("staffops-golden-") | not)
-             | ([.externalRefs[]?.referenceLocator][0])' "$f"
-    done | sort
+    echo "$1"
   } | (sha256sum 2>/dev/null || shasum -a 256) | cut -d' ' -f1
 }
 
+sha256_of() { (sha256sum 2>/dev/null || shasum -a 256) < "$1" | cut -d' ' -f1; }
+
+# apko's tar holds the OCI index (index.json), manifests/configs as "sha256:<hex>" and layers
+# as "<hex>.tar.gz". Rearrange them as an OCI image layout without touching a single byte.
+make_layout() {
+  local tmp f hex
+  tmp="$(mktemp -d)"
+  tar -xf "$TAR" -C "$tmp"
+  rm -rf "$LAYOUT"; mkdir -p "$LAYOUT/blobs/sha256"
+  for f in "$tmp"/*; do
+    case "$(basename "$f")" in
+      index.json)     mv "$f" "$LAYOUT/index.json";;
+      manifest.json)  ;;                                  # docker-load metadata, not OCI
+      sha256:*)       hex="$(basename "$f")"; mv "$f" "$LAYOUT/blobs/sha256/${hex#sha256:}";;
+      *.tar.gz)       hex="$(basename "$f" .tar.gz)"; mv "$f" "$LAYOUT/blobs/sha256/$hex";;
+      *)              rm -rf "$tmp"; die "unexpected entry in apko tar: $(basename "$f")";;
+    esac
+  done
+  rm -rf "$tmp"
+  printf '{"imageLayoutVersion":"1.0.0"}' > "$LAYOUT/oci-layout"
+  # Every blob must be content-addressed correctly, or the push would not be the tested image.
+  for f in "$LAYOUT"/blobs/sha256/*; do
+    [[ "$(sha256_of "$f")" == "$(basename "$f")" ]] || die "blob $(basename "$f") does not match its digest"
+  done
+  # One single-arch layout per arch for scanners: `trivy --input` ignores --platform on a
+  # multi-arch layout and always scans the first manifest. Same blobs, hardlinked.
+  local a al
+  IFS=',' read -r -a al <<< "$ARCHS"
+  for a in "${al[@]}"; do
+    a="$(oci_arch "$a")"
+    rm -rf "$LAYOUT-$a"; mkdir -p "$LAYOUT-$a/blobs/sha256"
+    for f in "$LAYOUT"/blobs/sha256/*; do ln "$f" "$LAYOUT-$a/blobs/sha256/"; done
+    cp "$LAYOUT/oci-layout" "$LAYOUT-$a/"
+    jq -c --arg a "$a" '.manifests |= map(select(.platform.architecture == $a))' "$LAYOUT/index.json" > "$LAYOUT-$a/index.json"
+    [[ "$(jq '.manifests | length' "$LAYOUT-$a/index.json")" == 1 ]] || die "no single $a manifest in the index"
+  done
+}
+
+local_digest() { echo "sha256:$(sha256_of "$LAYOUT/index.json")"; }
+
 build_local() {
+  local pkgs fp
   log "build $NAME ($ARCHS)"
-  rm -f "dist/sbom/$NAME"/sbom-*.spdx.json
-  tc apko build "$CONFIG" "$REPO:${TAGS[0]}" "dist/images/$NAME.tar" --arch "$ARCHS" "${MARKER_ARGS[@]}" --sbom-path "dist/sbom/$NAME" >/dev/null
-  fingerprint > "$FP_FILE"
-  log "fingerprint $NAME $(cut -c1-16 "$FP_FILE")"
+  pkgs="$(resolved_packages)"; [[ -n "$pkgs" ]] || die "apko resolved no packages for $CONFIG"
+  fp="$(fingerprint "$pkgs")"
+  rm -f "dist/sbom/$NAME"/sbom-*.spdx.json "$TAR" "$FP_FILE"
+  tc apko build "$CONFIG" "$REPO:${TAGS[0]}" "$TAR" --arch "$ARCHS" "${MARKER_ARGS[@]}" \
+    --annotations "$FP_KEY:$fp" --sbom-path "dist/sbom/$NAME" >/dev/null
+  if [[ "$(sbom_packages)" != "$pkgs" ]]; then
+    diff <(echo "$pkgs") <(sbom_packages) >&2 || true
+    die "$NAME: package set changed between resolve and build (Alpine updated mid-build?); run again"
+  fi
+  make_layout
+  echo "$fp" > "$FP_FILE"
+  log "fingerprint $NAME ${fp:0:16}, index $(local_digest | cut -c1-19)"
 }
 
 published_fingerprint() {
@@ -192,7 +275,7 @@ published_fingerprint() {
 set_output() { [[ -z "${GITHUB_OUTPUT:-}" ]] || echo "$1" >> "$GITHUB_OUTPUT"; }
 
 if [[ $PUBLISH -eq 1 ]]; then
-  [[ -f "$FP_FILE" ]] || build_local
+  [[ -f "$FP_FILE" && -f "$LAYOUT/index.json" ]] || build_local
   FP="$(cat "$FP_FILE")"
   OLD="$(published_fingerprint)"
   if [[ "$FP" == "$OLD" && "${FORCE_PUBLISH:-0}" != 1 ]]; then
@@ -202,20 +285,23 @@ if [[ $PUBLISH -eq 1 ]]; then
     exit 0
   fi
   log "changed $NAME: published=${OLD:0:16}${OLD:+ }new=${FP:0:16}"
-  refs=()
+  DIGEST="$(local_digest)"
+  log "publish $NAME $DIGEST -> $REPO:${TAGS[0]} ($ARCHS)"
+  pushed="$(tc crane push --index "$LAYOUT" "$REPO:${TAGS[0]}" | tail -n1)"
+  [[ "$pushed" == "$REPO@$DIGEST" ]] || die "pushed $pushed, expected $REPO@$DIGEST: registry did not store the built index"
   for t in "${TAGS[@]}"; do
-    refs+=("$REPO:$t")
-    [[ -z "$SUFFIX" ]] || refs+=("$REPO:$t-$SUFFIX")
+    refs=("$t"); [[ -z "$SUFFIX" ]] || refs+=("$t-$SUFFIX")
+    for r in "${refs[@]}"; do
+      [[ "$r" == "${TAGS[0]}" ]] && continue
+      tc crane tag "$REPO@$DIGEST" "$r" >/dev/null
+      log "tag     $REPO:$r"
+    done
   done
-  log "publish $NAME -> ${refs[*]} ($ARCHS)"
-  # apko prints the multi-arch index digest ref on stdout.
-  tc apko publish "$CONFIG" "${refs[@]}" --arch "$ARCHS" "${MARKER_ARGS[@]}" \
-    --annotations "$FP_KEY:$FP" --sbom-path "dist/sbom/$NAME" \
-    | tail -n1 | tee "dist/images/$NAME.digest"
+  echo "$REPO@$DIGEST" | tee "dist/images/$NAME.digest"
   set_output "published=true"
 else
   build_local
-  docker load -q < "dist/images/$NAME.tar" >&2
+  docker load -q < "$TAR" >&2
   # apko tags loaded images as <ref>-<arch>; give the host arch the plain tag too.
   host="$(oci_arch "$(host_apk_arch)")"
   if docker image inspect "$REPO:${TAGS[0]}-$host" >/dev/null 2>&1; then

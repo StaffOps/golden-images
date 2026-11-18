@@ -106,7 +106,7 @@ cosign verify ghcr.io/staffops/node:24 \
 
 ## Build locally
 
-You only need Docker. melange and apko run inside a pinned toolchain container
+You only need Docker. melange, apko and crane run inside a pinned toolchain container
 (`toolchain/Dockerfile`), which is built automatically on first use.
 
 `scripts/golden.sh` covers the four flows. `<target>` is a family (`node`, `python`, `go`,
@@ -177,8 +177,9 @@ scanners have nothing new to ingest. Set `FORCE_PUBLISH=1` to override.
 
 1. **packages**: restores `dist/packages` from the Actions cache, builds what is missing
    for both archs (arm64 via QEMU), and hands the directory to the image jobs as an artifact.
-2. **image** (one job per image): apko build → smoke tests on amd64 → on `main` only,
-   publish the multi-arch index with SBOMs → cosign keyless sign by digest → Trivy report.
+2. **image** (one job per image): apko build (amd64 + arm64) → smoke tests on amd64 → on
+   `main` only, push **that same image** (no rebuild) → cosign keyless sign by digest + SBOM
+   attestation → Trivy report on both archs, scanning the exact bytes that were published.
 
 It runs on PRs (build + test, no publish), on push to `main`, weekly on Monday (to pick up
 Alpine security fixes) and manually with a `target`.
@@ -189,7 +190,7 @@ Alpine security fixes) and manually with a `target`.
 |---|---|
 | Alpine packages (Node, Python, Go 1.26, libs) | weekly rebuild picks up patch releases, no PR |
 | .NET 10 runtime/ASP.NET/SDK, Go 1.27 (our melange packages) | Renovate PR → `checksums` workflow recomputes hashes on the branch → CI builds + tests |
-| melange / apko toolchain | Renovate PR (+ checksums from the signed release `checksums.txt`) |
+| melange / apko / crane toolchain | Renovate PR (+ checksums from the signed release `checksums.txt`) |
 | Alpine stable branch (`v3.24` → next) | one grouped Renovate PR touching every image (node-22 excluded) |
 | GitHub Actions | weekly grouped Renovate PR, pinned by SHA |
 
