@@ -1,6 +1,6 @@
 # ADR-0001: Custom packages live in this repo, served from a mounted cache directory
 
-- Status: proposed
+- Status: accepted (2026-11-18)
 - Date: 2026-11-16
 - Deciders: StaffOps platform
 
