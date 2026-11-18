@@ -8,6 +8,7 @@ metadata:
   description: "Minimal, multi-arch, signed base images (apko + melange) for StaffOps projects"
   annotations:
     github.com/project-slug: StaffOps/golden-images
+    argoworkflows.argoproj.io/workflow-selector: app.kubernetes.io/part-of=golden-images
   links:
     - url: https://github.com/StaffOps/golden-images
       title: Repository
