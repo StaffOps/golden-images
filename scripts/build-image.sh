@@ -43,10 +43,40 @@ done < <(jq -r --arg n "$NAME" '.images[] | select(.name == $n) | (.packages // 
 # /etc/staffops/golden-image.json. Because it lives in the apk database, any SBOM of an
 # image built FROM this one (Trivy, Syft, ...) lists it as a component. That is how
 # consumers stay linked to the exact golden image + build they depend on (Dependency-Track).
+#
+# The marker also owns the OS identity (replaces Alpine's alpine-release package):
+#   /usr/lib/os-release (+ /etc/os-release link): NAME/PRETTY_NAME are ours, IMAGE_ID /
+#     IMAGE_VERSION / BUILD_ID carry image, build and commit. ID=alpine and VERSION_ID=<Alpine
+#     point release> must stay: scanners build the purl (pkg:apk/alpine/...?distro=X) from
+#     them and look CVEs up in Alpine's secdb per release. A made-up VERSION_ID = zero CVEs.
+#   /etc/alpine-release: Trivy reads it to identify Alpine when os-release is not decisive.
 MARKER="staffops-golden-$NAME"
 BUILD_VERSION="${GOLDEN_BUILD_VERSION:-$(date -u +%Y%m%d.%H%M%S)}"   # CI pins one per run
 COMMIT="$(git -C "$ROOT" rev-parse --short=12 HEAD 2>/dev/null || echo dev)"
 META_DIR="dist/meta"
+
+# Alpine point release (e.g. 3.24.4) of the branch this image uses, from the official
+# APKINDEX: the version of the alpine-release package, minus the -rN suffix.
+alpine_version() {
+  local branch idx
+  branch="$(grep -oE 'alpinelinux\.org/alpine/v[0-9]+\.[0-9]+/main' "$CONFIG" | head -n1 | grep -oE 'v[0-9]+\.[0-9]+')" \
+    || die "$CONFIG: no Alpine vX.Y/main repository"
+  idx="https://dl-cdn.alpinelinux.org/alpine/$branch/main/x86_64/APKINDEX.tar.gz"
+  # No early `exit` in awk: closing the pipe would SIGPIPE tar and, with pipefail, kill the script.
+  curl -fsSL --retry 3 "$idx" | tar -xzO APKINDEX \
+    | awk '/^P:/{p=substr($0,3)} /^V:/{if (p=="alpine-release" && !v) {v=substr($0,3); sub(/-r[0-9]+$/,"",v)}} END{print v}'
+}
+ALPINE_VERSION="$(alpine_version)"
+[[ "$ALPINE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "could not resolve the Alpine release for $CONFIG (got '$ALPINE_VERSION')"
+
+# Runtime images (run-as 65532) must not ship a shell. Some Alpine packages (nodejs,
+# ca-certificates, icu-data-en) declare a dependency on /bin/sh only for their install
+# scripts, which apko never runs; the resolver would then pull busybox-binsh + busybox.
+# The marker provides /bin/sh on paper (no file), so nothing installs a shell.
+PROVIDES=""
+if [[ "$(yq -r '.accounts."run-as" // ""' "$CONFIG")" == "65532" ]]; then
+  PROVIDES=$'  dependencies:\n    provides:\n      - /bin/sh'
+fi
 
 build_marker() {
   # Markers use their own throwaway key, so image jobs never need the package private key.
@@ -72,6 +102,7 @@ package:
   options:
     no-depends: true
     no-provides: true
+$PROVIDES
 environment:
   contents:
     repositories:
@@ -80,10 +111,24 @@ environment:
       - busybox
 pipeline:
   - runs: |
-      mkdir -p "\${{targets.destdir}}/etc/staffops"
-      cat > "\${{targets.destdir}}/etc/staffops/golden-image.json" <<'JSON'
+      d="\${{targets.destdir}}"
+      mkdir -p "\$d/etc/staffops" "\$d/usr/lib"
+      cat > "\$d/etc/staffops/golden-image.json" <<'JSON'
       $json
       JSON
+      cat > "\$d/usr/lib/os-release" <<'OSREL'
+      NAME="StaffOps Golden Image"
+      ID=alpine
+      VERSION_ID=$ALPINE_VERSION
+      IMAGE_ID=$NAME
+      IMAGE_VERSION=$BUILD_VERSION
+      BUILD_ID=$COMMIT
+      PRETTY_NAME="StaffOps Golden Image $NAME ($BUILD_VERSION)"
+      HOME_URL="https://github.com/StaffOps/golden-images"
+      BUG_REPORT_URL="https://github.com/StaffOps/golden-images/issues"
+      OSREL
+      ln -s ../usr/lib/os-release "\$d/etc/os-release"
+      echo "$ALPINE_VERSION" > "\$d/etc/alpine-release"
 EOF
   IFS=',' read -r -a al <<< "$ARCHS"
   for a in "${al[@]}"; do
@@ -114,12 +159,14 @@ FP_FILE="dist/images/$NAME.${ARCHS//,/-}.fingerprint"   # per arch set: amd64-on
 FP_KEY="dev.staffops.golden-image.fingerprint"
 
 # Content fingerprint: config + catalog entry + exact resolved apk set per arch (from the SBOMs),
-# excluding the marker (its version is the build time). Equal fingerprint = same image content.
+# excluding the marker (its version is the build time). The marker's os-release carries the
+# Alpine point release, so that goes in explicitly. Equal fingerprint = same image content.
 fingerprint() {
   local sboms=("dist/sbom/$NAME"/sbom-*.spdx.json) f
   {
     cat "$CONFIG"
     jq -c --arg n "$NAME" '.images[] | select(.name == $n)' "$CATALOG"
+    echo "alpine-version $ALPINE_VERSION"
     for f in "${sboms[@]}"; do
       [[ "$f" == *sbom-index.spdx.json ]] && continue
       jq -r '.packages[] | select(([.externalRefs[]?.referenceLocator][0] // "") | startswith("pkg:apk/"))
