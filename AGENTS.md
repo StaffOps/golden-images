@@ -36,9 +36,16 @@ dist/                 git-ignored: packages/ (the mounted APK cache), images/, s
 - Locale: the images keep Alpine's default ICU data (English only). That is a deliberate
   choice to keep them small. If an app needs other locales (for example pt-BR formatting),
   add `icu-data-full` to its own image or to a new variant.
-- Every image installs `alpine-release` (`/etc/os-release`). Without it, Trivy still detects
-  Alpine but emits **no purl** for any package, and Dependency-Track matches vulnerabilities by purl.
-  Do not remove it.
+- Runtime images stay shell-free even though `nodejs`, `ca-certificates` and `icu-data-en`
+  declare `depends: /bin/sh` (for install scripts that apko never runs). Without help, the
+  resolver pulls `busybox-binsh` + `busybox` into node and dotnet runtimes. For every image
+  with `run-as: "65532"`, the golden marker declares `provides: /bin/sh` on paper (no file),
+  so no shell is installed. `noshell` in `test-image.sh` (all runtime suites) enforces it.
+  Found and fixed on 2026-11-18: node 22/24/26 and dotnet aspnet/runtime 10 had shipped busybox.
+- No image installs Alpine's `alpine-release`: the golden marker owns the OS identity instead
+  (see below). Never ship an image with no `os-release`/`alpine-release` at all: Trivy still
+  detects Alpine but emits **no purl** for any package, and Dependency-Track matches
+  vulnerabilities by purl. Verified on 2026-11-18.
 - Alpine Python is PEP 668 "externally managed". The `-dev` image sets
   `PIP_BREAK_SYSTEM_PACKAGES=1`, and the runtime image has no pip at all.
 - `go` images set `GOTOOLCHAIN=local` so that a `go.mod` with a newer `toolchain` line fails
@@ -57,6 +64,30 @@ dist/                 git-ignored: packages/ (the mounted APK cache), images/, s
 signed with its own throwaway key. That is what links every derived image's SBOM to its
 golden image. CI pins one version per job, so the image it tests and the one it
 publishes carry the same marker.
+
+The marker therefore does three jobs: traceability (`golden-image.json`), the OS identity
+(below) and, on runtime images, the `/bin/sh` provider (see Gotchas).
+
+### OS identity (also in the marker)
+
+The marker writes `/usr/lib/os-release` (with `/etc/os-release` linked to it) and
+`/etc/alpine-release`, replacing Alpine's `alpine-release` package and its ~60 `alpine-keys`
+files. The branding is ours; the two scanner fields stay Alpine's:
+
+| Field | Value | Why |
+|---|---|---|
+| `NAME`, `PRETTY_NAME`, `HOME_URL` | StaffOps Golden Image ... | branding |
+| `IMAGE_ID`, `IMAGE_VERSION`, `BUILD_ID` | image name, build version, commit | standard os-release fields for image builds |
+| `ID` | `alpine` | **do not change** |
+| `VERSION_ID` + `/etc/alpine-release` | Alpine point release (`3.24.4`), read from the branch APKINDEX at build time | **do not change** |
+
+Trivy and Grype build the purl (`pkg:apk/alpine/<pkg>@<ver>?distro=<VERSION_ID>`) from `ID` and
+`VERSION_ID`, then look CVEs up in Alpine's secdb for that release. Measured on 2026-11-18:
+`VERSION_ID=20261118...` makes both scanners report "alpine 20261118..." (no data, so zero
+CVEs in silence); `ID=staffops` (even with `ID_LIKE=alpine`) drops every purl. With the layout
+above, `python-3.14-dev` gave the same package purls and the same 33 Grype findings as with
+`alpine-release`. `tests` checks the identity on every image (`identity` in `test-image.sh`).
+The Alpine point release is part of the content fingerprint, since the marker is excluded.
 
 ## Why .NET comes from Microsoft, not Alpine
 

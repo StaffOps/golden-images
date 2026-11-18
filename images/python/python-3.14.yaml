@@ -4,7 +4,6 @@ contents:
     - https://dl-cdn.alpinelinux.org/alpine/v3.24/main
   packages:
     - alpine-baselayout-data
-    - alpine-release
     - ca-certificates-bundle
     - tzdata
     - python3=~3.14

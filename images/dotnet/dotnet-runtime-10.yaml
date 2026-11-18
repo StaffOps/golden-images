@@ -8,7 +8,6 @@ contents:
     - '@local /work/dist/packages'
   packages:
     - alpine-baselayout-data
-    - alpine-release
     - ca-certificates-bundle
     - tzdata
     - msft-dotnet-runtime-10@local

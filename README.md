@@ -1,9 +1,11 @@
 # golden-images
 
 Minimal, multi-arch (amd64 + arm64) and signed base images for the StaffOps and
-PersonalAIgent projects. Images are built declaratively with [apko](https://github.com/chainguard-dev/apko)
-on top of Alpine; the few things Alpine does not ship are packaged with
-[melange](https://github.com/chainguard-dev/melange) in this same repo.
+PersonalAIgent projects. Runtime images are **distroless**: the language runtime and its
+libraries only, with no shell and no package manager. Images are built declaratively with
+[apko](https://github.com/chainguard-dev/apko) from Alpine packages; the few things Alpine
+does not ship are packaged with [melange](https://github.com/chainguard-dev/melange) in this
+same repo. Every image identifies itself as **StaffOps Golden Image** (`/etc/os-release`).
 
 ```
 apks/*.yaml ──melange──▶ dist/packages/   (mounted cache, latest version only)
@@ -26,10 +28,19 @@ images/**/*.yaml ──apko──◀─────┘  + Alpine v3.24 ──▶
 Every published tag also gets a dated immutable twin (`24-20261116`). In production, pin by
 digest. Conventions:
 
-- **Runtime images** run as `nonroot` (uid/gid 65532), have **no shell** and no package
-  manager, and use `/app` as the working directory.
+- **Runtime images** (`static`, `node`, `python`, `dotnet-aspnet`, `dotnet-runtime`) are
+  distroless: they run as `nonroot` (uid/gid 65532), have **no shell** (not even busybox) and
+  no package manager, and use `/app` as the working directory. Every build checks this.
+  - `docker exec ... sh` and `HEALTHCHECK CMD curl ...` do not work. Use the runtime itself
+    (`node -e`, `python -c`) or a Kubernetes probe, and to debug use the matching `-dev`
+    image or `kubectl debug` with an ephemeral container.
 - **`-dev` / SDK / Go images** run as root and include bash, git, curl and a C toolchain.
   They are meant for build stages and CI jobs.
+- **OS identity**: `/etc/os-release` says `NAME="StaffOps Golden Image"`, with the image name,
+  build version and commit in `IMAGE_ID`, `IMAGE_VERSION` and `BUILD_ID`. `ID=alpine` and
+  `VERSION_ID` (the Alpine release) stay as they are on purpose: vulnerability scanners use
+  them to look up CVEs for the Alpine packages inside. Without them every scan comes back
+  clean because no data matches, not because the image is safe.
 
 ### Typical multi-stage use
 
@@ -61,7 +72,8 @@ ENTRYPOINT ["/venv/bin/python", "-m", "uvicorn", "app.main:app", "--host", "0.0.
 
 Each image installs a small generated APK, `staffops-golden-<name>` (for example
 `staffops-golden-node-24`), whose version is the build timestamp (`20261116.181500`). The
-package writes `/etc/staffops/golden-image.json` (image, tags, version, commit).
+package writes `/etc/staffops/golden-image.json` (image, tags, version, commit) and the
+image's `/etc/os-release` (see *OS identity* above).
 
 Because it is a real entry in the apk database, any SBOM generated for an image built
 `FROM` a golden image (Trivy, Syft, Docker Scout...) lists it as a component, without

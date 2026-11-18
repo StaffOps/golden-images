@@ -5,7 +5,6 @@ contents:
     - https://dl-cdn.alpinelinux.org/alpine/v3.24/community
   packages:
     - alpine-baselayout-data
-    - alpine-release
     - ca-certificates-bundle
     - tzdata
     - nodejs-current=~26
