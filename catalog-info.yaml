@@ -8,8 +8,10 @@ metadata:
   description: "Minimal, multi-arch, signed base images (apko + melange) for StaffOps projects"
   annotations:
     github.com/project-slug: StaffOps/golden-images
+    backstage.io/techdocs-ref: dir:.
     argoworkflows.argoproj.io/workflow-selector: app.kubernetes.io/part-of=golden-images
     backstage.io/kubernetes-namespace: argo-workflows
+  tags: [apko, melange, alpine, container-image, shell]
   links:
     - url: https://github.com/StaffOps/golden-images
       title: Repository
@@ -28,7 +30,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/static
     staffops.space/dependency-track-project: ghcr.io/staffops/static
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, apko, alpine]
 spec:
   type: library
   lifecycle: production
@@ -45,7 +48,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/node
     staffops.space/dependency-track-project: ghcr.io/staffops/node
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, nodejs, apko]
 spec:
   type: library
   lifecycle: production
@@ -62,7 +66,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/python
     staffops.space/dependency-track-project: ghcr.io/staffops/python
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, python, apko]
 spec:
   type: library
   lifecycle: production
@@ -79,7 +84,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/go
     staffops.space/dependency-track-project: ghcr.io/staffops/go
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, go, apko]
 spec:
   type: library
   lifecycle: production
@@ -96,7 +102,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/dotnet-sdk
     staffops.space/dependency-track-project: ghcr.io/staffops/dotnet-sdk
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, dotnet, apko]
 spec:
   type: library
   lifecycle: production
@@ -113,7 +120,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/dotnet-aspnet
     staffops.space/dependency-track-project: ghcr.io/staffops/dotnet-aspnet
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, dotnet, aspnetcore, apko]
 spec:
   type: library
   lifecycle: production
@@ -130,7 +138,8 @@ metadata:
     github.com/project-slug: StaffOps/golden-images
     staffops.space/image: ghcr.io/staffops/dotnet-runtime
     staffops.space/dependency-track-project: ghcr.io/staffops/dotnet-runtime
-  tags: [container-image, multi]
+    backstage.io/techdocs-ref: dir:.
+  tags: [container-image, dotnet, apko]
 spec:
   type: library
   lifecycle: production

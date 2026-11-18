@@ -1,0 +1,13 @@
+site_name: golden-images
+site_description: Minimal, multi-arch, signed base images (apko + melange) for StaffOps projects
+repo_url: https://github.com/StaffOps/golden-images
+edit_uri: edit/main/docs/
+
+nav:
+  - Home: index.md
+  - Decisions:
+      - 'ADR-0001: Package distribution': adr/0001-package-distribution.md
+  - Inventory: inventory.md
+
+plugins:
+  - techdocs-core
