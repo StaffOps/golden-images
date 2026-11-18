@@ -13,8 +13,8 @@ catalog.json          source of truth: image name → config, repo, tags, test s
 tests/<suite>.sh      smoke checks, sourced by scripts/test-image.sh (host-side docker run)
 scripts/golden.sh     entrypoint: packages | build | full | image | test | list
 scripts/build-packages.sh   melange, cache-aware, latest-only + prune + reindex
-scripts/build-image.sh      apko build (+ docker load) or --publish
-toolchain/Dockerfile  pinned melange + apko (+ bubblewrap) by version and sha256
+scripts/build-image.sh      apko build → OCI layout (+ docker load); --publish pushes it with crane
+toolchain/Dockerfile  pinned melange + apko + crane (+ bubblewrap) by version and sha256
 dist/                 git-ignored: packages/ (the mounted APK cache), images/, sbom/
 ```
 
@@ -115,10 +115,23 @@ every image built FROM it. Verified: declaring 10.0.1 gives 35 CVEs, 10.0.15 giv
 - `scripts/plan.sh <base> [head]` maps changed files to images (see README). It replaces
   the reference repo's hand-maintained `triggers.yml`, using `catalog.json` `packages`/`test`.
   When adding a file type that influences an image, teach `plan.sh` about it.
-- `build-image.sh --publish` compares the content fingerprint with the annotation on the
-  published image and exits with `published=false` when they are equal. Sign/attest steps
-  run only when `published == 'true'`. The fingerprint excludes the marker (its version is
-  the build time) and depends on the arch set (`dist/images/<name>.<archs>.fingerprint`).
+- **Build once, publish those bytes.** `build-image.sh` runs `apko build` to
+  `dist/images/<name>.<archs>.tar`, rearranges it (no byte changed) into the OCI layout
+  `<name>.<archs>.oci`, and `--publish` pushes that layout with `crane push --index`. It never
+  rebuilds, so the tested image, the scanned image and the published image share one index
+  digest, and the SBOM (which names that digest) matches the registry. `--publish` fails if
+  the registry reports a different digest. Do not go back to `apko publish`: it rebuilds, and
+  Alpine can change in between.
+- Scanners use `<name>.<archs>.oci-<arch>`: single-arch layouts with the same hardlinked
+  blobs. `trivy --input` ignores `--platform` on a multi-arch layout and always scans the
+  first manifest (verified with Trivy 0.70.0).
+- The content fingerprint is a build input (index annotation `dev.staffops.golden-image.fingerprint`):
+  config + catalog entry + Alpine release + the package set from `apko show-packages`,
+  resolved with the marker added (it provides `/bin/sh`). After the build the SBOM package set
+  must equal it, or the build fails ("package set changed between resolve and build").
+- `--publish` compares the fingerprint with the published annotation and exits with
+  `published=false` when they are equal. Sign/attest steps run only when `published == 'true'`.
+  The fingerprint excludes the marker (its version is the build time) and depends on the arch set.
 
 ## Bumping versions
 
