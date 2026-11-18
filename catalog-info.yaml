@@ -1,0 +1,136 @@
+# Backstage catalog: Domain (GitHub org) -> System (this repo) -> Component(s).
+# Names aligned with Dependency-Track (StaffOps/homelab-gitops helm-charts/argo-events/image-scan/catalog.yaml).
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: golden-images
+  title: golden-images
+  description: "Minimal, multi-arch, signed base images (apko + melange) for StaffOps projects"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+  links:
+    - url: https://github.com/StaffOps/golden-images
+      title: Repository
+      icon: github
+spec:
+  owner: group:staffops
+  domain: staffops
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-static
+  title: static
+  description: "Container image ghcr.io/staffops/static"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/static
+    staffops.space/dependency-track-project: ghcr.io/staffops/static
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-node
+  title: node
+  description: "Container image ghcr.io/staffops/node"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/node
+    staffops.space/dependency-track-project: ghcr.io/staffops/node
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-python
+  title: python
+  description: "Container image ghcr.io/staffops/python"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/python
+    staffops.space/dependency-track-project: ghcr.io/staffops/python
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-go
+  title: go
+  description: "Container image ghcr.io/staffops/go"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/go
+    staffops.space/dependency-track-project: ghcr.io/staffops/go
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-dotnet-sdk
+  title: dotnet-sdk
+  description: "Container image ghcr.io/staffops/dotnet-sdk"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/dotnet-sdk
+    staffops.space/dependency-track-project: ghcr.io/staffops/dotnet-sdk
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-dotnet-aspnet
+  title: dotnet-aspnet
+  description: "Container image ghcr.io/staffops/dotnet-aspnet"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/dotnet-aspnet
+    staffops.space/dependency-track-project: ghcr.io/staffops/dotnet-aspnet
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: golden-dotnet-runtime
+  title: dotnet-runtime
+  description: "Container image ghcr.io/staffops/dotnet-runtime"
+  annotations:
+    github.com/project-slug: StaffOps/golden-images
+    staffops.space/image: ghcr.io/staffops/dotnet-runtime
+    staffops.space/dependency-track-project: ghcr.io/staffops/dotnet-runtime
+  tags: [container-image, multi]
+spec:
+  type: library
+  lifecycle: production
+  owner: group:staffops
+  system: golden-images
