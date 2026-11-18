@@ -179,3 +179,21 @@ jobs:
           ignore-unfixed: true
           exit-code: "0"
           skip-setup-trivy: true
+
+  # Single required status check for branch protection. Image job names are dynamic
+  # (one per planned image, none when nothing is planned), so protection requires this
+  # job instead: it passes only when every job above succeeded or was skipped.
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [packages, image]
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Every job succeeded (or was skipped because no image was planned)
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "job results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "::error::a required job ended with '$r'"; exit 1;; esac
+          done

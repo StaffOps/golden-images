@@ -106,8 +106,17 @@ cosign verify ghcr.io/staffops/node:24 \
 
 ## Build locally
 
-You only need Docker. melange, apko and crane run inside a pinned toolchain container
-(`toolchain/Dockerfile`), which is built automatically on first use.
+melange, apko and crane run inside a pinned toolchain container (`toolchain/Dockerfile`),
+which is built automatically on first use, so they are never installed on the host. The
+scripts themselves run on the host and need:
+
+| Tool | Why | macOS |
+|---|---|---|
+| Docker (with `buildx`) | toolchain container, `docker load`, smoke tests | Docker Desktop |
+| bash **4+** | the scripts use associative arrays and `mapfile`; macOS ships bash 3.2 | `brew install bash` |
+| `jq` | reads `catalog.json`, SBOMs and manifests | preinstalled (or `brew install jq`) |
+| `yq` (mikefarah, v4) | reads melange specs and apko configs | `brew install yq` |
+| `curl`, `git`, `tar` | Alpine release lookup, commit stamping, OCI layout | preinstalled |
 
 `scripts/golden.sh` covers the four flows. `<target>` is a family (`node`, `python`, `go`,
 `dotnet`, `base`), an image name from `catalog.json`, or `all`.
